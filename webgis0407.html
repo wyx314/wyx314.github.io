@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>福州仓山区公园分布专题地图</title>
+  <style type="text/css">
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; font-family: "Microsoft YaHei"; }
+
+    /* 1. 页眉区域 */
+    .header {
+      width: 100%;
+      height: 60px;
+      background: #0052D9;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding-left: 20px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    /* 2. 主体布局 */
+    .container {
+      display: flex;
+      height: calc(100% - 60px);
+    }
+
+    /* 3. 地图区域 */
+    #map {
+      flex: 1;
+      height: 100%;
+    }
+
+    /* 4. 底图库区域 */
+    .layer-panel {
+      width: 260px;
+      background: #f5f7fa;
+      border-left: 1px solid #ddd;
+      padding: 20px;
+    }
+
+    .layer-panel h3 {
+      font-size: 16px;
+      margin-bottom: 10px;
+      border-left: 4px solid #0052D9;
+      padding-left: 8px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0;
+      border: none;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    #searchInput {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 页眉区域 -->
+  <div class="header">福州仓山区公园分布专题地图</div>
+
+  <div class="container">
+    <!-- 地图区域 -->
+    <div id="map"></div>
+
+    <!-- 底图库区域 -->
+    <div class="layer-panel">
+      <h3>底图切换（差别极大）</h3>
+      <button onclick="setMapStreet()">普通街道地图</button>
+      <button onclick="setMapEarth()">夜景地球地图</button>
+
+      <h3>公园专题图层</h3>
+      <button onclick="showParks()">显示公园点位</button>
+      <button onclick="hideParks()">隐藏公园点位</button>
+
+      <h3>地点搜索</h3>
+      <input type="text" id="searchInput" placeholder="输入公园名称">
+      <button onclick="doSearch()">搜索</button>
+    </div>
+  </div>
+
+<script type="text/javascript" src="https://api.map.baidu.com/api?v=1.0&type=webgl&ak=B5d6ITHfB8VizIYJDfqz9S5l0SgsKhYv"></script>
+<script type="text/javascript">
+// 初始化地图
+var map = new BMapGL.Map("map");
+var centerPt = new BMapGL.Point(119.313, 26.047);
+map.centerAndZoom(centerPt, 13);
+map.enableScrollWheelZoom(true);
+
+// 比例尺
+map.addControl(new BMapGL.ScaleControl({ anchor: BMAP_ANCHOR_BOTTOM_RIGHT }));
+
+// 仓山区公园
+var parks = [
+  { name: "金山公园", pt: new BMapGL.Point(119.296, 26.058) },
+  { name: "烟台山公园", pt: new BMapGL.Point(119.321, 26.046) },
+  { name: "高盖山公园", pt: new BMapGL.Point(119.328, 26.029) },
+  { name: "飞凤山奥体公园", pt: new BMapGL.Point(119.281, 26.042) },
+  { name: "花海公园", pt: new BMapGL.Point(119.336, 26.051) },
+  { name: "乌龙江湿地公园", pt: new BMapGL.Point(119.308, 26.032) },
+  { name: "闽江公园南园", pt: new BMapGL.Point(119.288, 26.062) }
+];
+
+var markers = [];
+
+// 创建标注 + 信息窗口（按官方文档）
+parks.forEach(function (item) {
+  var marker = new BMapGL.Marker(item.pt);
+  map.addOverlay(marker);
+  markers.push(marker);
+
+  marker.addEventListener("click", function () {
+    var opts = { width: 220, height: 60, title: "公园信息" };
+    var infoWindow = new BMapGL.InfoWindow(item.name, opts);
+    map.openInfoWindow(infoWindow, item.pt);
+  });
+});
+
+// ===================================
+// 底图 1：普通街道地图
+// ===================================
+function setMapStreet() {
+  map.setMapType(BMAP_NORMAL_MAP);
+}
+
+// ===================================
+// 底图 2：夜景地球卫星图（差别巨大）
+// ===================================
+function setMapEarth() {
+  map.setMapType(BMAP_EARTH_MAP);
+}
+
+// ===================================
+// 图层显示/隐藏
+// ===================================
+function showParks() {
+  markers.forEach(m => m.show());
+}
+function hideParks() {
+  markers.forEach(m => m.hide());
+}
+
+// ===================================
+// 搜索
+// ===================================
+function doSearch() {
+  var key = document.getElementById("searchInput").value.trim();
+  if (!key) return;
+  var local = new BMapGL.LocalSearch(map, { renderOptions: { map: map } });
+  local.search("福州仓山区 " + key);
+}
+</script>
+</body>
+</html>
