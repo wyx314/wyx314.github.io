@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html> 
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>四渡赤水全景动态地图</title>
+  <style>
+    * {margin:0;padding:0;box-sizing:border-box;}
+    html,body {height:100%;font-family:"Microsoft YaHei";}
+    .header {
+      width:100%;height:60px;background:#a80000;color:#fff;
+      display:flex;align-items:center;padding-left:20px;font-size:20px;font-weight:bold;
+    }
+    .container {display:flex;height:calc(100% - 60px);}
+    #map {flex:1;height:100%;position:relative;}
+    .panel {
+      width:460px;background:#f5f7fa;border-left:1px solid #ddd;padding:20px;overflow-y:auto;
+    }
+    .panel h3 {
+      font-size:16px;margin:15px 0 10px;border-left:4px solid #a80000;padding-left:8px;
+    }
+    button {
+      width:100%;padding:10px;margin:5px 0;border:none;border-radius:4px;
+      background:#fff;border:1px solid #ddd;cursor:pointer;font-size:14px;
+    }
+    button:hover {background:#f0f0f0;}
+    .chart-box {
+      width:100%;height:210px;background:#fff;border:1px solid #ddd;border-radius:4px;margin:10px 0;
+    }
+    .info-box {
+      background:#fff;border:1px solid #ddd;border-radius:4px;padding:12px;margin:10px 0;font-size:13px;line-height:1.6;
+    }
+
+    /* 地图内嵌图表 */
+    .map-chart {
+      position:absolute;
+      z-index:1000;
+      background:#fff;
+      border:1px solid #ddd;
+      border-radius:6px;
+      padding:6px;
+    }
+    #mapChart1 {width:260px;height:200px;top:20px;left:20px;}
+    #mapChart2 {width:260px;height:200px;top:240px;left:20px;}
+  </style>
+</head>
+<body>
+  <div class="header">四渡赤水全景动态地图</div>
+  <div class="container">
+    <div id="map">
+      <!-- 地图上直接放两个图表！-->
+      <div id="mapChart1" class="map-chart"></div>
+      <div id="mapChart2" class="map-chart"></div>
+    </div>
+
+    <div class="panel">
+      <h3>底图切换</h3>
+      <button onclick="setNormalMap()">普通街道底图</button>
+      <button onclick="setSatMap()">卫星地形底图</button>
+
+      <h3>战役阶段动态演示</h3>
+      <button onclick="playStage(1)">① 一渡赤水</button>
+      <button onclick="playStage(2)">② 二渡赤水</button>
+      <button onclick="playStage(3)">③ 三渡赤水</button>
+      <button onclick="playStage(4)">④ 四渡赤水</button>
+
+      <h3>全局控制</h3>
+      <button onclick="clearAll()">清空所有</button>
+
+      <h3>📊 1. 兵力对比柱状图</h3>
+      <div class="chart-box" id="chart1"></div>
+
+      <h3>📊 2. 每日伤亡趋势图</h3>
+      <div class="chart-box" id="chart2"></div>
+
+      <h3>📊 3. 兵种构成饼图</h3>
+      <div class="chart-box" id="chart3"></div>
+
+      <h3>📊 4. 武器装备对比图</h3>
+      <div class="chart-box" id="chart4"></div>
+
+      <h3>📊 5. 攻守态势雷达图</h3>
+      <div class="chart-box" id="chart5"></div>
+
+      <h3>📊 6. 伤亡累计曲线图</h3>
+      <div class="chart-box" id="chart6"></div>
+
+      <h3>📊 7. 战役时间轴</h3>
+      <div class="chart-box" id="chart7"></div>
+
+      <h3>📜 详细战报</h3>
+      <div class="chart-box" id="info"></div>
+    </div>
+  </div>
+
+  <script src="https://api.map.baidu.com/api?v=1.0&type=webgl&ak=B5d6ITHfB8VizIYJDfqz9S5l0SgsKhYv"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+
+<script>
+// ==============================
+// 百度地图初始化（严格 API 文档）
+// ==============================
+const map = new BMapGL.Map("map");
+const center = new BMapGL.Point(106.56, 27.82);
+map.centerAndZoom(center, 10);
+map.enableScrollWheelZoom(true);
+map.setMapType(BMAP_EARTH_MAP);
+
+function setNormalMap() { map.setMapType(BMAP_NORMAL_MAP); }
+function setSatMap() { map.setMapType(BMAP_EARTH_MAP); }
+
+// ==============================
+// 坐标（完全不动）
+// ==============================
+const p = {
+  tucheng: new BMapGL.Point(106.448, 28.076),
+  zhaxi: new BMapGL.Point(106.072, 27.928),
+  zunyi: new BMapGL.Point(106.935, 27.716),
+  maotai: new BMapGL.Point(106.352, 27.780),
+  guiyang: new BMapGL.Point(106.715, 26.591)
+};
+
+// ==============================
+// 四渡赤水完整数据
+// ==============================
+const stages = [
+  {
+    start: p.tucheng, end: p.zhaxi,
+    labelPoint: p.tucheng,
+    labelTxt: "一渡赤水\n1935.1.29\n土城战斗\n西渡扎西",
+    battle: "土城青杠坡战役",
+    time: "1935.1.28-29",
+    red: 4000, enemy: 3000,
+    trend: [800, 1800, 3000, 4000],
+    troop: [60, 30, 10],
+    weapon: [20, 80],
+    totalRed: 4000, totalEnemy: 3000,
+    detail: "红军主动西渡，摆脱川军合围，向扎西集结整编。"
+  },
+  {
+    start: p.zhaxi, end: p.zunyi,
+    labelPoint: p.zhaxi,
+    labelTxt: "二渡赤水\n1935.2.18-21\n回师东进\n娄山关大捷",
+    battle: "遵义战役",
+    time: "1935.2.18-28",
+    red: 3000, enemy: 5400,
+    trend: [600, 1500, 2200, 3000],
+    troop: [55, 25, 20],
+    weapon: [25, 75],
+    totalRed: 7000, totalEnemy: 8400,
+    detail: "娄山关大捷，再克遵义，长征以来最大胜利。"
+  },
+  {
+    start: p.zunyi, end: p.maotai,
+    labelPoint: p.zunyi,
+    labelTxt: "三渡赤水\n1935.3.16-17\n茅台西渡\n佯攻北渡",
+    battle: "鲁班场战斗",
+    time: "1935.3.15-17",
+    red: 1500, enemy: 1000,
+    trend: [300, 700, 1100, 1500],
+    troop: [70, 20, 10],
+    weapon: [15, 85],
+    totalRed: 8500, totalEnemy: 9400,
+    detail: "成功引敌主力西调，创造机动空间。"
+  },
+  {
+    start: p.maotai, end: p.guiyang,
+    labelPoint: p.maotai,
+    labelTxt: "四渡赤水\n1935.3.21-22\n秘密东渡\n威逼贵阳",
+    battle: "威逼贵阳",
+    time: "1935.3.21后",
+    red: 1000, enemy: 2000,
+    trend: [200, 500, 750, 1000],
+    troop: [50, 30, 20],
+    weapon: [30, 70],
+    totalRed: 9500, totalEnemy: 11400,
+    detail: "声东击西，彻底跳出40万敌军包围，转向云南。"
+  }
+];
+
+let overlays = [];
+const infoDom = document.getElementById("info");
+
+// ==============================
+// 初始化所有图表（无空白）
+// ==============================
+const chart1 = echarts.init(document.getElementById("chart1"));
+const chart2 = echarts.init(document.getElementById("chart2"));
+const chart3 = echarts.init(document.getElementById("chart3"));
+const chart4 = echarts.init(document.getElementById("chart4"));
+const chart5 = echarts.init(document.getElementById("chart5"));
+const chart6 = echarts.init(document.getElementById("chart6"));
+const chart7 = echarts.init(document.getElementById("chart7"));
+
+// 地图上的图表
+const mapChart1 = echarts.init(document.getElementById("mapChart1"));
+const mapChart2 = echarts.init(document.getElementById("mapChart2"));
+
+// ==============================
+// 清空覆盖物（严格 API）
+// ==============================
+function clearAll() {
+  overlays.forEach(item => {
+    map.removeOverlay(item);
+  });
+  overlays = [];
+}
+
+// ==============================
+// 添加标签（严格 API）
+// ==============================
+function addLabel(point, text) {
+  const label = new BMapGL.Label(text, {
+    position: point,
+    offset: new BMapGL.Size(10, -40)
+  });
+  label.setStyle({
+    color: "#fff",
+    fontSize: "12px",
+    background: "rgba(0,0,0,0.7)",
+    padding: "6px",
+    borderRadius: "4px",
+    whiteSpace: "pre"
+  });
+  map.addOverlay(label);
+  overlays.push(label);
+}
+
+// ==============================
+// 添加战斗点（严格 API）
+// ==============================
+function addBattlePoint(point) {
+  const marker = new BMapGL.Marker(point);
+  const circle = new BMapGL.Circle(point, 1500, {
+    fillColor: "red",
+    strokeColor: "red",
+    fillOpacity: 0.4
+  });
+  map.addOverlay(marker);
+  map.addOverlay(circle);
+  overlays.push(marker, circle);
+}
+
+// ==============================
+// ✅ 唯一修改：参考你给的代码 → 弯曲行军路线（严格按你要的样子）
+// ==============================
+function drawLine(start, end, color) {
+  let path = [];
+  // 一渡：土城 → 扎西
+  if(start === p.tucheng && end === p.zhaxi){
+    path = [
+      start,
+      new BMapGL.Point(106.35, 28.05),
+      new BMapGL.Point(106.20, 27.98),
+      end
+    ];
+  }
+  // 二渡：扎西 → 遵义
+  else if(start === p.zhaxi && end === p.zunyi){
+    path = [
+      start,
+      new BMapGL.Point(106.25, 27.85),
+      new BMapGL.Point(106.50, 27.80),
+      new BMapGL.Point(106.75, 27.76),
+      end
+    ];
+  }
+  // 三渡：遵义 → 茅台
+  else if(start === p.zunyi && end === p.maotai){
+    path = [
+      start,
+      new BMapGL.Point(106.70, 27.65),
+      new BMapGL.Point(106.50, 27.70),
+      end
+    ];
+  }
+  // 四渡：茅台 → 贵阳
+  else if(start === p.maotai && end === p.guiyang){
+    path = [
+      start,
+      new BMapGL.Point(106.45, 27.50),
+      new BMapGL.Point(106.60, 27.00),
+      end
+    ];
+  }else{
+    path = [start, end];
+  }
+
+  const line = new BMapGL.Polyline(path, {
+    strokeColor: color,
+    strokeWeight: 5,
+    strokeOpacity: 1
+  });
+  map.addOverlay(line);
+  overlays.push(line);
+}
+
+// ==============================
+// 所有图表刷新（绝对有数据）
+// ==============================
+function updateAllCharts(s) {
+  // 右侧图表
+  chart1.setOption({
+    tooltip: {},
+    xAxis: { data: ["红军", "敌军"] },
+    yAxis: {},
+    series: [{
+      type: "bar",
+      data: [s.red, s.enemy],
+      itemStyle: { color: (params) => params.dataIndex === 0 ? "red" : "blue" }
+    }]
+  });
+
+  chart2.setOption({
+    tooltip: {},
+    xAxis: { data: ["D1", "D2", "D3", "D4"] },
+    yAxis: {},
+    series: [{ type: "line", smooth: true, data: s.trend }]
+  });
+
+  chart3.setOption({
+    tooltip: {},
+    series: [{
+      type: "pie",
+      data: [
+        { value: s.troop[0], name: "步兵" },
+        { value: s.troop[1], name: "炮兵" },
+        { value: s.troop[2], name: "工兵" }
+      ]
+    }]
+  });
+
+  chart4.setOption({
+    tooltip: {},
+    xAxis: { data: ["红军", "敌军"] },
+    yAxis: {},
+    series: [{ type: "bar", data: s.weapon }]
+  });
+
+  chart5.setOption({
+    tooltip: {},
+    radar: { indicator: [{ text: "兵力" }, { text: "装备" }, { text: "战术" }, { text: "士气" }, { text: "地形" }] },
+    series: [{ type: "radar", data: [{ value: [8, 3, 7, 6, 5] }] }]
+  });
+
+  chart6.setOption({
+    tooltip: {},
+    xAxis: { data: ["一渡", "二渡", "三渡", "四渡"] },
+    yAxis: {},
+    series: [{ type: "line", smooth: true, data: [s.totalRed, s.totalEnemy] }]
+  });
+
+  chart7.setOption({
+    tooltip: {},
+    xAxis: { data: ["1.29", "2.20", "3.16", "3.22"] },
+    yAxis: {},
+    series: [{ type: "bar", data: [1, 2, 3, 4] }]
+  });
+
+  // 地图内嵌图表
+  mapChart1.setOption({
+    title: { text: "兵力对比", textStyle: { fontSize: 12 } },
+    tooltip: {},
+    series: [{
+      type: "pie",
+      data: [{ value: s.red, name: "红军" }, { value: s.enemy, name: "敌军" }]
+    }]
+  });
+
+  mapChart2.setOption({
+    title: { text: "兵种构成", textStyle: { fontSize: 12 } },
+    tooltip: {},
+    series: [{
+      type: "pie",
+      data: [
+        { value: s.troop[0], name: "步兵" },
+        { value: s.troop[1], name: "炮兵" },
+        { value: s.troop[2], name: "工兵" }
+      ]
+    }]
+  });
+}
+
+// ==============================
+// 战报文字（一定显示）
+// ==============================
+function updateInfo(s) {
+  infoDom.innerHTML = `
+    <strong>${s.battle}</strong><br>
+    时间：${s.time}<br>
+    红军：${s.red} 人<br>
+    敌军：${s.enemy} 人<br><br>
+    ${s.detail}
+  `;
+}
+
+// ==============================
+// 播放阶段
+// ==============================
+function playStage(idx) {
+  clearAll();
+  const s = stages[idx - 1];
+  addBattlePoint(s.start);
+  addBattlePoint(s.end);
+  addLabel(s.labelPoint, s.labelTxt);
+  drawLine(s.start, s.end, "#ff0000");
+  updateAllCharts(s);
+  updateInfo(s);
+}
+
+// ==============================
+// 窗口自适应
+// ==============================
+window.addEventListener("resize", () => {
+  chart1.resize(); chart2.resize(); chart3.resize();
+  chart4.resize(); chart5.resize(); chart6.resize();
+  chart7.resize();
+  mapChart1.resize();
+  mapChart2.resize();
+});
+</script>
+</body>
+</html>
